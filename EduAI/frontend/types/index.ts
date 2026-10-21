@@ -149,8 +149,6 @@ export interface QuizQuestion {
   id: string;
   question: string;
   options: string[];
-  correct_index: number;
-  explanation: string;
   difficulty: "Easy" | "Medium" | "Hard";
   topic: string;
 }

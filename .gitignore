@@ -9,4 +9,8 @@
 !**/.env.example
 **/*.tsbuildinfo
 **/*.log
+**/__pycache__/
+**/.venv/
+EduAI/backend/data/*.db
+EduAI/backend/data/*.sqlite3
 /train folder/

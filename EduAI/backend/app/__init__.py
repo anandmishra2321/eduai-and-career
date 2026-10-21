@@ -1,0 +1,1 @@
+"""EduAI API application."""
