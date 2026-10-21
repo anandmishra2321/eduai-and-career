@@ -1,0 +1,437 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --eduai-font-size: 100%;
+  --eduai-bg: #07111f;
+  --eduai-surface: #101e30;
+  --eduai-surface-raised: #172941;
+  --eduai-text: #f1f5f9;
+  --eduai-muted: #a3b2c7;
+  --eduai-border: rgba(148, 163, 184, 0.2);
+  --eduai-panel-background: color-mix(in srgb, var(--eduai-surface) 88%, transparent);
+  --eduai-panel-border: var(--eduai-border);
+  --eduai-accent: #22d3ee;
+  --eduai-accent-soft: rgba(34, 211, 238, 0.12);
+  --eduai-radius: 1rem;
+  --eduai-glass-blur: 18px;
+  --eduai-shadow-raised: 0 12px 30px rgba(0, 0, 0, 0.28);
+  --eduai-shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.2), inset -3px -3px 8px rgba(255, 255, 255, 0.035);
+  --bg-void: var(--eduai-bg);
+  --bg-deep: var(--eduai-surface);
+  --cyber-cyan: var(--eduai-accent);
+  --cyber-blue: #3B82F6;
+  --cyber-gold: #F59E0B;
+}
+
+:root[data-surface-style="glass"] {
+  --eduai-glass-blur: 18px;
+  --eduai-panel-background: color-mix(in srgb, var(--eduai-surface) 88%, transparent);
+  --eduai-panel-border: var(--eduai-border);
+  --eduai-shadow-raised: 0 12px 30px rgba(0, 0, 0, 0.28);
+  --eduai-shadow-inset: none;
+}
+
+:root[data-surface-style="neumorphic"] {
+  --eduai-glass-blur: 0px;
+  --eduai-panel-background: var(--eduai-surface);
+  --eduai-panel-border: transparent;
+  --eduai-shadow-raised: 7px 7px 18px rgba(0, 0, 0, 0.26), -5px -5px 16px color-mix(in srgb, var(--eduai-surface-raised) 58%, transparent);
+  --eduai-shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.2), inset -3px -3px 8px rgba(255, 255, 255, 0.035);
+}
+
+:root[data-surface-style="holographic"] {
+  --eduai-glass-blur: 14px;
+  --eduai-panel-background: color-mix(in srgb, var(--eduai-surface) 88%, var(--eduai-accent-soft));
+  --eduai-panel-border: color-mix(in srgb, var(--eduai-accent) 42%, var(--eduai-border));
+  --eduai-shadow-raised: 0 12px 34px color-mix(in srgb, var(--eduai-accent) 14%, transparent), 0 4px 18px rgba(0, 0, 0, 0.24);
+  --eduai-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+:root[data-surface-style="precision"] {
+  --eduai-glass-blur: 0px;
+  --eduai-panel-background: var(--eduai-surface);
+  --eduai-panel-border: var(--eduai-border);
+  --eduai-shadow-raised: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --eduai-shadow-inset: none;
+}
+
+:root[data-eduai-theme="neural-dark"] {
+  --eduai-bg: #07111f;
+  --eduai-surface: #101e30;
+  --eduai-surface-raised: #172941;
+  --eduai-text: #f1f5f9;
+  --eduai-muted: #a3b2c7;
+  --eduai-border: rgba(125, 211, 252, 0.2);
+}
+
+:root[data-eduai-theme="aurora-light"] {
+  --eduai-bg: #f3f6fb;
+  --eduai-surface: #ffffff;
+  --eduai-surface-raised: #e8eef7;
+  --eduai-text: #172033;
+  --eduai-muted: #4b5870;
+  --eduai-border: rgba(51, 65, 85, 0.2);
+}
+
+:root[data-eduai-theme="cyberpunk"] {
+  --eduai-bg: #15111e;
+  --eduai-surface: #21182e;
+  --eduai-surface-raised: #30203e;
+  --eduai-text: #f8f5ff;
+  --eduai-muted: #c0b3d2;
+  --eduai-border: rgba(232, 121, 249, 0.25);
+}
+
+:root[data-eduai-theme="emerald-focus"] {
+  --eduai-bg: #071914;
+  --eduai-surface: #10271f;
+  --eduai-surface-raised: #18372a;
+  --eduai-text: #ecfdf5;
+  --eduai-muted: #a7c7b6;
+  --eduai-border: rgba(110, 231, 183, 0.22);
+}
+
+:root[data-eduai-theme="cosmic-3d"] {
+  --eduai-bg: #09091c;
+  --eduai-surface: #17152e;
+  --eduai-surface-raised: #242047;
+  --eduai-text: #f4f2ff;
+  --eduai-muted: #b8b4d4;
+  --eduai-border: rgba(167, 139, 250, 0.25);
+}
+
+:root[data-eduai-theme="graphite-pro"] {
+  --eduai-bg: #151719;
+  --eduai-surface: #222629;
+  --eduai-surface-raised: #30363a;
+  --eduai-text: #f1f3f5;
+  --eduai-muted: #b6bdc4;
+  --eduai-border: rgba(209, 213, 219, 0.22);
+}
+
+:root[data-accent="cyan"] { --eduai-accent: #22d3ee; --eduai-accent-soft: rgba(34, 211, 238, 0.14); }
+:root[data-accent="blue"] { --eduai-accent: #60a5fa; --eduai-accent-soft: rgba(96, 165, 250, 0.15); }
+:root[data-accent="violet"] { --eduai-accent: #a78bfa; --eduai-accent-soft: rgba(167, 139, 250, 0.15); }
+:root[data-accent="magenta"] { --eduai-accent: #f472b6; --eduai-accent-soft: rgba(244, 114, 182, 0.15); }
+:root[data-accent="mint"] { --eduai-accent: #6ee7b7; --eduai-accent-soft: rgba(110, 231, 183, 0.15); }
+:root[data-accent="gold"] { --eduai-accent: #fbbf24; --eduai-accent-soft: rgba(251, 191, 36, 0.15); }
+:root[data-accent="cyan"] { --eduai-accent-strong: #22d3ee; }
+:root[data-accent="blue"] { --eduai-accent-strong: #60a5fa; }
+:root[data-accent="violet"] { --eduai-accent-strong: #a78bfa; }
+:root[data-accent="magenta"] { --eduai-accent-strong: #f472b6; }
+:root[data-accent="mint"] { --eduai-accent-strong: #6ee7b7; }
+:root[data-accent="gold"] { --eduai-accent-strong: #fbbf24; }
+
+:root[data-color-mode="light"] {
+  --eduai-bg: #f3f6fb;
+  --eduai-surface: #ffffff;
+  --eduai-surface-raised: #e8eef7;
+  --eduai-text: #172033;
+  --eduai-muted: #4b5870;
+  --eduai-border: rgba(51, 65, 85, 0.2);
+}
+
+:root[data-color-mode="light"][data-accent="cyan"] { --eduai-accent-strong: #0e7490; }
+:root[data-color-mode="light"][data-accent="blue"] { --eduai-accent-strong: #1d4ed8; }
+:root[data-color-mode="light"][data-accent="violet"] { --eduai-accent-strong: #6d28d9; }
+:root[data-color-mode="light"][data-accent="magenta"] { --eduai-accent-strong: #be185d; }
+:root[data-color-mode="light"][data-accent="mint"] { --eduai-accent-strong: #047857; }
+:root[data-color-mode="light"][data-accent="gold"] { --eduai-accent-strong: #a16207; }
+
+:root[data-color-mode="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-color-mode="light"] {
+  color-scheme: light;
+}
+
+:root[data-color-mode="system"] {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-color-mode="system"] {
+    --eduai-bg: #f3f6fb;
+    --eduai-surface: #ffffff;
+    --eduai-surface-raised: #e8eef7;
+    --eduai-text: #172033;
+    --eduai-muted: #4b5870;
+    --eduai-border: rgba(51, 65, 85, 0.2);
+  }
+  :root[data-color-mode="system"][data-accent="cyan"] { --eduai-accent-strong: #0e7490; }
+  :root[data-color-mode="system"][data-accent="blue"] { --eduai-accent-strong: #1d4ed8; }
+  :root[data-color-mode="system"][data-accent="violet"] { --eduai-accent-strong: #6d28d9; }
+  :root[data-color-mode="system"][data-accent="magenta"] { --eduai-accent-strong: #be185d; }
+  :root[data-color-mode="system"][data-accent="mint"] { --eduai-accent-strong: #047857; }
+  :root[data-color-mode="system"][data-accent="gold"] { --eduai-accent-strong: #a16207; }
+}
+
+:root[data-density="compact"] {
+  --eduai-radius: 0.65rem;
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+:root[data-eduai-theme] [class*="text-slate-50"],
+:root[data-eduai-theme] [class*="text-slate-100"],
+:root[data-eduai-theme] [class*="text-slate-200"],
+:root[data-eduai-theme] [class*="text-white"] {
+  color: var(--eduai-text) !important;
+}
+
+:root[data-eduai-theme] [class*="text-slate-300"],
+:root[data-eduai-theme] [class*="text-slate-400"],
+:root[data-eduai-theme] [class*="text-slate-500"],
+:root[data-eduai-theme] [class*="text-slate-600"] {
+  color: var(--eduai-muted) !important;
+}
+
+:root[data-eduai-theme] [class*="text-cyan-"],
+:root[data-eduai-theme] [class*="text-sky-"],
+:root[data-eduai-theme] [class*="text-blue-"],
+:root[data-eduai-theme] [class*="text-violet-"],
+:root[data-eduai-theme] [class*="text-purple-"],
+:root[data-eduai-theme] [class*="text-fuchsia-"],
+:root[data-eduai-theme] [class*="text-pink-"] {
+  color: var(--eduai-accent-strong) !important;
+}
+
+:root[data-eduai-theme] [class*="border-white/"],
+:root[data-eduai-theme] [class*="border-slate-"],
+:root[data-eduai-theme] [class*="border-cyan-"],
+:root[data-eduai-theme] [class*="border-sky-"],
+:root[data-eduai-theme] [class*="border-blue-"],
+:root[data-eduai-theme] [class*="border-violet-"],
+:root[data-eduai-theme] [class*="border-purple-"],
+:root[data-eduai-theme] [class*="border-fuchsia-"],
+:root[data-eduai-theme] [class*="border-pink-"] {
+  border-color: var(--eduai-border) !important;
+}
+
+:root[data-eduai-theme] [class*="bg-black/"],
+:root[data-eduai-theme] [class*="bg-[#"],
+:root[data-eduai-theme] [class*="bg-slate-950"],
+:root[data-eduai-theme] [class*="bg-slate-900"],
+:root[data-eduai-theme] [class*="bg-gray-950"],
+:root[data-eduai-theme] [class*="bg-cyan-950"],
+:root[data-eduai-theme] [class*="bg-sky-950"],
+:root[data-eduai-theme] [class*="bg-violet-950"],
+:root[data-eduai-theme] [class*="bg-purple-950"],
+:root[data-eduai-theme] [class*="bg-fuchsia-950"],
+:root[data-eduai-theme] [class*="bg-pink-950"] {
+  background-color: var(--eduai-surface) !important;
+}
+
+:root[data-eduai-theme] [class*="bg-cyan-300"] {
+  background-color: var(--eduai-accent) !important;
+}
+
+:root[data-eduai-theme] :where(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--eduai-accent-strong);
+  outline-offset: 3px;
+}
+
+::selection {
+  color: var(--eduai-bg);
+  background: var(--eduai-accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: var(--eduai-bg);
+  color: var(--eduai-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  font-size: var(--eduai-font-size);
+  transition: background-color 180ms ease, color 180ms ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom cyber scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.55);
+}
+
+/* Glass panel utility */
+.glass-panel {
+  background: var(--eduai-panel-background);
+  backdrop-filter: blur(var(--eduai-glass-blur));
+  -webkit-backdrop-filter: blur(var(--eduai-glass-blur));
+  border: 1px solid var(--eduai-panel-border);
+  box-shadow: var(--eduai-shadow-raised), var(--eduai-shadow-inset);
+}
+
+.glass-panel-hover:hover {
+  border-color: var(--eduai-accent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--eduai-accent) 28%, transparent);
+}
+
+.eduai-glass {
+  background: var(--eduai-panel-background);
+  backdrop-filter: blur(var(--eduai-glass-blur));
+  -webkit-backdrop-filter: blur(var(--eduai-glass-blur));
+}
+
+:root[data-surface-style="neumorphic"][data-color-mode="light"] {
+  --eduai-shadow-raised: 7px 7px 18px rgba(30, 41, 59, 0.12), -5px -5px 16px rgba(255, 255, 255, 0.95);
+  --eduai-shadow-inset: inset 3px 3px 8px rgba(30, 41, 59, 0.08), inset -3px -3px 8px rgba(255, 255, 255, 0.85);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-surface-style="neumorphic"][data-color-mode="system"] {
+    --eduai-shadow-raised: 7px 7px 18px rgba(30, 41, 59, 0.12), -5px -5px 16px rgba(255, 255, 255, 0.95);
+    --eduai-shadow-inset: inset 3px 3px 8px rgba(30, 41, 59, 0.08), inset -3px -3px 8px rgba(255, 255, 255, 0.85);
+  }
+}
+
+:root[data-surface-style="neumorphic"] .eduai-glass,
+:root[data-surface-style="neumorphic"] .glass-panel,
+:root[data-surface-style="neumorphic"] .glass-panel-hover {
+  background: var(--eduai-surface);
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--eduai-shadow-raised), var(--eduai-shadow-inset);
+}
+
+:root[data-surface-style="holographic"] .eduai-glass,
+:root[data-surface-style="holographic"] .glass-panel,
+:root[data-surface-style="holographic"] .glass-panel-hover {
+  border-color: color-mix(in srgb, var(--eduai-accent) 42%, var(--eduai-border));
+  box-shadow: var(--eduai-shadow-raised), var(--eduai-shadow-inset);
+}
+
+:root[data-surface-style="precision"] .eduai-glass,
+:root[data-surface-style="precision"] .glass-panel,
+:root[data-surface-style="precision"] .glass-panel-hover {
+  background: var(--eduai-surface);
+  border-color: var(--eduai-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--eduai-shadow-raised);
+}
+
+.eduai-surface-panel {
+  background: var(--eduai-panel-background);
+  border-color: var(--eduai-panel-border);
+  box-shadow: var(--eduai-shadow-raised), var(--eduai-shadow-inset);
+}
+
+:root[data-surface-style="neumorphic"] .eduai-glass > .pointer-events-none,
+:root[data-surface-style="precision"] .eduai-glass > .pointer-events-none {
+  display: none;
+}
+
+.eduai-icon {
+  background: var(--eduai-accent-soft);
+  border-color: color-mix(in srgb, var(--eduai-accent) 40%, transparent);
+  color: var(--eduai-accent-strong);
+}
+
+.cyan-text-glow {
+  text-shadow: 0 0 20px color-mix(in srgb, var(--eduai-accent) 60%, transparent);
+}
+
+.gold-text-glow {
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .project-actions,
+  .project-information a {
+    display: none !important;
+  }
+
+  .project-information section,
+  .project-information .fact-card {
+    break-inside: avoid;
+    border-color: #d1d5db !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
+
+  .project-information {
+    padding: 0 !important;
+  }
+}
+
+/* Smooth canvas wrapper */
+.webgl-canvas-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: auto;
+  z-index: 0;
+}
+
+.eduai-workspace {
+  background: var(--eduai-bg);
+  color: var(--eduai-text);
+}
+
+.eduai-shell-panel {
+  background-color: color-mix(in srgb, var(--eduai-bg) 94%, transparent);
+  border-color: var(--eduai-border);
+}
+
+.eduai-accent-text {
+  color: var(--eduai-accent-strong);
+}
+
+.eduai-accent-surface {
+  background-color: var(--eduai-accent);
+  color: #07111f;
+}
+
+.eduai-surface {
+  background-color: var(--eduai-surface);
+  border-color: var(--eduai-border);
+}
+
+:root[data-color-mode="light"] .eduai-accent-surface,
+:root[data-color-mode="system"] .eduai-accent-surface {
+  color: #fff;
+}
+
+:root[data-density="compact"] .eduai-workspace .glass-panel {
+  padding: 1rem;
+}
