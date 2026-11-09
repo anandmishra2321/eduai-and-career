@@ -50,10 +50,10 @@ export type ThemePreferences = {
 };
 
 export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
-  theme: "neural-dark",
+  theme: "aurora-light",
   surfaceStyle: "glass",
-  mode: "dark",
-  accent: "cyan",
+  mode: "light",
+  accent: "blue",
   fontSize: 100,
   density: "comfortable",
   reducedMotion: false,

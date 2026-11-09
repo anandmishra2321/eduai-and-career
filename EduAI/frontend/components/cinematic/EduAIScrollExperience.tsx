@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   UserCheck,
   Settings2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GlassPanel } from "@/components/ui/GlassPanel";
@@ -39,14 +41,18 @@ interface EduAIScrollExperienceProps {
 
 export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [backendStatus, setBackendStatus] = useState<"checking" | "online" | "offline">("checking");
   const [voiceState, setVoiceState] = useState<VoiceState>("IDLE");
   const [isOverdrive, setIsOverdrive] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [isBuildingProfile, setIsBuildingProfile] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [agentReply, setAgentReply] = useState("");
   const [agentError, setAgentError] = useState("");
   const [agentBusy, setAgentBusy] = useState(false);
+  const [agentConversationId, setAgentConversationId] = useState<string>();
+  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
   // Form states
   const [email, setEmail] = useState("");
@@ -60,6 +66,28 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
   const progressBarRef = useRef<HTMLDivElement>(null);
   const { login, register, startOfflineDemo, isAuthenticated, user } = useAuth();
   const { preferences } = useThemePreferences();
+  const shouldRenderCanvas = !preferences.reducedMotion
+    && (preferences.mode === "dark" || (preferences.mode === "system" && systemPrefersDark));
+
+  useEffect(() => {
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystemColorScheme = () => setSystemPrefersDark(colorScheme.matches);
+    updateSystemColorScheme();
+    colorScheme.addEventListener("change", updateSystemColorScheme);
+    return () => colorScheme.removeEventListener("change", updateSystemColorScheme);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.health.check()
+      .then(() => {
+        if (!cancelled) setBackendStatus("online");
+      })
+      .catch(() => {
+        if (!cancelled) setBackendStatus("offline");
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Scroll tracking with smooth animation frame
   useEffect(() => {
@@ -156,7 +184,7 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
   return (
     <div ref={containerRef} className="relative w-full bg-[#030712] text-slate-100 min-h-[700vh]">
       {/* Fixed Fullscreen 3D Canvas */}
-      {!preferences.reducedMotion && (
+      {shouldRenderCanvas && (
         <EduAICanvas
           scrollProgress={scrollProgress}
           voiceState={voiceState}
@@ -276,20 +304,22 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
             </div>
           </div>
           <p className="text-sm text-slate-300 mb-5 leading-relaxed">
-            The frontend supports performance predictions and analytics through the EduAI API. Model availability, version, and service health are not verified here.
+            Academic estimates and analytics are available through the EduAI API. Estimates use a local heuristic, not a trained prediction model.
           </p>
           <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-black/40 border border-cyan-500/15 font-mono text-xs">
             <div>
               <div className="text-slate-400 text-[10px]">PREDICTION</div>
-              <div className="text-emerald-400 font-bold text-sm">Not configured</div>
+              <div className="text-emerald-400 font-bold text-sm">Heuristic API</div>
             </div>
             <div>
               <div className="text-slate-400 text-[10px]">ANALYTICS</div>
-              <div className="text-cyan-300 font-bold text-sm">API not verified</div>
+              <div className={`font-bold text-sm ${backendStatus === "online" ? "text-emerald-400" : backendStatus === "offline" ? "text-rose-400" : "text-cyan-300"}`}>
+                {backendStatus === "online" ? "API connected" : backendStatus === "offline" ? "API unavailable" : "Checking API"}
+              </div>
             </div>
             <div>
               <div className="text-slate-400 text-[10px]">PROFILE DATA</div>
-              <div className="text-sky-300 font-bold text-sm">Not loaded</div>
+              <div className="text-sky-300 font-bold text-sm">Sign in to load</div>
             </div>
           </div>
         </GlassPanel>
@@ -321,10 +351,10 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
           </p>
           <div className="flex flex-wrap gap-2 text-xs font-mono">
             <span className="px-2.5 py-1 rounded-md bg-emerald-950/50 border border-emerald-500/40 text-emerald-300">
-              Skills graph · not loaded
+              Skills graph · sign in to load
             </span>
-            <span className="px-2.5 py-1 rounded-md bg-cyan-950/50 border border-cyan-500/40 text-cyan-300">
-              Service · not verified
+            <span className={`px-2.5 py-1 rounded-md border font-mono ${backendStatus === "online" ? "bg-emerald-950/50 border-emerald-500/40 text-emerald-300" : backendStatus === "offline" ? "bg-rose-950/50 border-rose-500/40 text-rose-300" : "bg-cyan-950/50 border-cyan-500/40 text-cyan-300"}`}>
+              {backendStatus === "online" ? "Backend · connected" : backendStatus === "offline" ? "Backend · unavailable" : "Backend · checking"}
             </span>
           </div>
         </GlassPanel>
@@ -352,12 +382,12 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
             </div>
           </div>
           <p className="text-sm text-slate-300 mb-4 leading-relaxed">
-            Career recommendations and roadmaps can be requested through the EduAI API. Model deployment, market data, and service health are not verified here.
+            Career recommendations and roadmaps are available through the EduAI API using local matching heuristics. Live market data is not connected.
           </p>
           <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20 font-mono text-xs">
             <div className="text-slate-400 text-[10px]">CAREER API</div>
             <div className="text-amber-300 font-bold text-sm mt-0.5">No recommendation loaded</div>
-            <div className="text-slate-400 text-[10px] mt-1">Model confidence: Not configured</div>
+            <div className="text-slate-400 text-[10px] mt-1">Recommendation method: local skill matching</div>
           </div>
         </GlassPanel>
       </section>
@@ -384,11 +414,11 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
             </div>
           </div>
           <p className="text-sm text-slate-300 mb-4 leading-relaxed">
-            Upload documents and ask grounded questions through the document API when that service is available. Supported formats and indexing status are determined by the backend.
+            Upload study material and ask questions grounded in its extracted text. Document processing and storage are provided by the connected backend.
           </p>
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-300">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>Document API route defined · health not verified</span>
+          <div className={`flex items-center gap-2 text-xs font-mono ${backendStatus === "online" ? "text-emerald-300" : backendStatus === "offline" ? "text-rose-300" : "text-cyan-300"}`}>
+            <span className={`w-2 h-2 rounded-full ${backendStatus === "online" ? "bg-emerald-400" : backendStatus === "offline" ? "bg-rose-400" : "bg-cyan-400 animate-pulse"}`} />
+            <span>{backendStatus === "online" ? "Document API · connected" : backendStatus === "offline" ? "Document API · unavailable" : "Document API · checking"}</span>
           </div>
         </GlassPanel>
       </section>
@@ -427,11 +457,54 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
       {/* ========================================================
           SCENE 6: CINEMATIC HOLOGRAPHIC AUTH PORTAL (90% - 100%)
           ======================================================== */}
-      <section className="h-[100vh] flex flex-col items-center justify-center relative z-30 px-6">
-        <GlassPanel
-          glow="cyan"
-          className="w-full max-w-md p-8 backdrop-blur-2xl bg-[#060B18]/85 border-cyan-500/30"
-        >
+      <section className="relative z-30 flex min-h-screen items-center justify-center px-6 py-24">
+        <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_32px_100px_rgba(37,99,235,0.16)] md:grid-cols-[1.05fr_0.95fr]">
+          <div
+            className="eduai-auth-hero relative hidden min-h-[620px] flex-col justify-between overflow-hidden p-10 text-white lg:p-12 md:flex"
+            style={{ background: "linear-gradient(145deg, #2563eb 0%, #4f46e5 52%, #0891b2 100%)" }}
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-cyan-200/30 blur-3xl" />
+            <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-rose-300/25 blur-3xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/15 shadow-lg backdrop-blur">
+                <GraduationCap className="h-6 w-6 text-white" aria-hidden="true" />
+              </div>
+              <div>
+                <div className="text-lg font-bold tracking-tight text-white">EduAI</div>
+                <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-white">Learning intelligence</div>
+              </div>
+            </div>
+
+            <div className="relative my-12">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">
+                <Sparkles className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+                A clearer path to what is next
+              </div>
+              <h2 className="max-w-md text-4xl font-semibold leading-[1.12] tracking-tight text-white xl:text-5xl">
+                Make your next big step feel possible.
+              </h2>
+              <p className="mt-5 max-w-sm text-sm leading-6 text-white">
+                Bring learning, progress, and career planning into one personal workspace built around your goals.
+              </p>
+              <div className="mt-9 flex flex-wrap gap-2">
+                {["Learn with focus", "Track your growth", "Plan your future"].map((item) => (
+                  <span key={item} className="rounded-full border border-white/25 bg-white/10 px-3 py-2 text-xs font-medium text-white backdrop-blur">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative flex items-center justify-between border-t border-white/20 pt-5 text-xs text-white">
+              <span>Personalized learning, one step at a time</span>
+              <ShieldCheck className="h-4 w-4 text-white" aria-hidden="true" />
+            </div>
+          </div>
+
+          <GlassPanel
+            glow="none"
+            className="w-full max-w-none rounded-none border-0 p-7 sm:p-10"
+          >
           {isBuildingProfile ? (
             <div className="py-12 text-center">
               <div className="w-16 h-16 mx-auto mb-4 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
@@ -490,15 +563,29 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
                     Forgot passcode?
                   </a>
                 </div>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full px-4 py-2.5 rounded-xl bg-black/50 border border-cyan-500/30 text-white placeholder-slate-500 text-sm focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition-all font-mono"
-                />
+                <div className="relative">
+                  <input
+                    id="eduai-login-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full px-4 py-2.5 pr-12 rounded-xl bg-black/50 border border-cyan-500/30 text-white placeholder-slate-500 text-sm focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 transition-all font-mono"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    className="absolute inset-y-0 right-2 flex items-center rounded-lg px-2 text-slate-400 transition hover:text-cyan-500"
+                  >
+                    {showPassword
+                      ? <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      : <Eye className="h-4 w-4" aria-hidden="true" />}
+                  </button>
+                </div>
               </div>
 
               <Button
@@ -685,10 +772,11 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
               </div>
             </form>
           )}
-        </GlassPanel>
+          </GlassPanel>
+        </div>
       </section>
 
-      {(agentBusy || agentReply || agentError) && (
+      {scrollProgress < 0.86 && (agentBusy || agentReply || agentError) && (
         <div
           role={agentError ? "alert" : "status"}
           aria-live="polite"
@@ -700,22 +788,25 @@ export function EduAIScrollExperience({ onEnterApp }: EduAIScrollExperienceProps
       )}
 
       {/* Floating AI Command Bar (accessible throughout the experience) */}
-      <CommandBar
-        onVoiceStateChange={setVoiceState}
-        onExecutePrompt={async (prompt) => {
-          setAgentBusy(true);
-          setAgentReply("");
-          setAgentError("");
-          try {
-            const response = await api.agent.execute(prompt);
-            setAgentReply(response.text);
-          } catch (error) {
-            setAgentError(error instanceof Error ? error.message : "AI assistant request failed.");
-          } finally {
-            setAgentBusy(false);
-          }
-        }}
-      />
+      {scrollProgress < 0.86 && (
+        <CommandBar
+          onVoiceStateChange={setVoiceState}
+          onExecutePrompt={async (prompt) => {
+            setAgentBusy(true);
+            setAgentReply("");
+            setAgentError("");
+            try {
+              const response = await api.agent.execute(prompt, undefined, agentConversationId);
+              setAgentConversationId(response.conversation_id);
+              setAgentReply(response.text);
+            } catch (error) {
+              setAgentError(error instanceof Error ? error.message : "AI assistant request failed.");
+            } finally {
+              setAgentBusy(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

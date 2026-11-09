@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import {
   ACCENT_OPTIONS,
   SURFACE_STYLES,
@@ -10,6 +10,15 @@ import {
 } from "@/components/providers/ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import type { AIProviderId } from "@/types";
+
+type AIProviderSettings = Awaited<ReturnType<typeof api.ai.getProviderSettings>>;
+const AI_PROVIDER_NAMES: Record<AIProviderId, string> = {
+  gemini: "Gemini",
+  openai: "OpenAI",
+  sambanova: "SambaNova",
+  cohere: "Cohere",
+};
 
 const cardStyle: CSSProperties = {
   background: "var(--eduai-panel-background)",
@@ -24,6 +33,81 @@ export default function SettingsPage() {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [aiSettings, setAISettings] = useState<AIProviderSettings | null>(null);
+  const [availableModels, setAvailableModels] = useState<Partial<Record<AIProviderId, string[]>>>({});
+  const [aiSettingsError, setAISettingsError] = useState("");
+  const [aiSettingsMessage, setAISettingsMessage] = useState("");
+  const [aiSettingsBusy, setAISettingsBusy] = useState(false);
+
+  useEffect(() => {
+    if (user?.role !== "admin") return;
+    let active = true;
+    void api.ai.getProviderSettings()
+      .then((settings) => {
+        if (active) setAISettings(settings);
+      })
+      .catch((error: unknown) => {
+        if (active) setAISettingsError(error instanceof Error ? error.message : "Could not load AI provider settings.");
+      });
+    return () => { active = false; };
+  }, [user?.role]);
+
+  const updateAIProvider = (provider: AIProviderId, update: Partial<AIProviderSettings["providers"][number]>) => {
+    setAISettings((current) => current
+      ? {
+          ...current,
+          providers: current.providers.map((item) => item.id === provider ? { ...item, ...update } : item),
+        }
+      : current);
+  };
+
+  const testAIProvider = async (provider: AIProviderId) => {
+    setAISettingsBusy(true);
+    setAISettingsError("");
+    setAISettingsMessage("");
+    try {
+      const result = await api.ai.testProvider(provider);
+      setAvailableModels((current) => ({ ...current, [provider]: result.models }));
+      const currentModel = aiSettings?.providers.find((item) => item.id === provider)?.model;
+      updateAIProvider(provider, {
+        status: result.status,
+        last_error: null,
+        model: currentModel || result.models[0] || "",
+      });
+      setAISettingsMessage(
+        `${AI_PROVIDER_NAMES[provider]} connected. ${result.models.length} models are available; the first compatible model is selected automatically if none is set.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Provider connectivity check failed.";
+      updateAIProvider(provider, { status: "error", last_error: message });
+      setAISettingsError(message);
+    } finally {
+      setAISettingsBusy(false);
+    }
+  };
+
+  const saveAISettings = async () => {
+    if (!aiSettings) return;
+    setAISettingsBusy(true);
+    setAISettingsError("");
+    setAISettingsMessage("");
+    try {
+      await api.ai.saveProviderSettings({
+        primary_provider: aiSettings.primary_provider,
+        fallback_provider: aiSettings.fallback_provider,
+        providers: aiSettings.providers.map(({ id, enabled, model }) => ({
+          provider: id,
+          enabled,
+          model: model || null,
+        })),
+      });
+      setAISettingsMessage("AI provider settings saved.");
+    } catch (error) {
+      setAISettingsError(error instanceof Error ? error.message : "Could not save AI provider settings.");
+    } finally {
+      setAISettingsBusy(false);
+    }
+  };
 
   const saveAppearance = async () => {
     setSaveMessage("");
@@ -106,6 +190,140 @@ export default function SettingsPage() {
         </header>
 
         <div className="space-y-6">
+          {user?.role === "admin" && (
+            <section aria-labelledby="ai-provider-title" className="eduai-surface-panel rounded-2xl border p-5 sm:p-7" style={cardStyle}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 id="ai-provider-title" className="text-xl font-semibold">AI provider settings</h2>
+                  <p className="mt-1 max-w-3xl text-sm" style={{ color: "var(--eduai-muted)" }}>
+                    Configure Gemini, OpenAI, SambaNova, and Cohere independently. Credentials stay on the backend; prompts are sent to the selected provider when cloud AI is enabled.
+                  </p>
+                </div>
+                <span className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: "var(--eduai-border)", color: "var(--eduai-muted)" }}>
+                  Backend credentials only
+                </span>
+              </div>
+
+              {aiSettings ? (
+                <>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm">Primary provider
+                      <select
+                        value={aiSettings.primary_provider}
+                        onChange={(event) => setAISettings({ ...aiSettings, primary_provider: event.target.value as AIProviderId })}
+                        className="mt-2 block w-full rounded-lg border bg-transparent px-3 py-2.5"
+                        style={{ borderColor: "var(--eduai-border)", color: "var(--eduai-text)" }}
+                      >
+                        <option value="gemini">Gemini</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="sambanova">SambaNova</option>
+                        <option value="cohere">Cohere</option>
+                      </select>
+                    </label>
+                    <label className="text-sm">Fallback provider
+                      <select
+                        value={aiSettings.fallback_provider}
+                        onChange={(event) => setAISettings({ ...aiSettings, fallback_provider: event.target.value as AIProviderId })}
+                        className="mt-2 block w-full rounded-lg border bg-transparent px-3 py-2.5"
+                        style={{ borderColor: "var(--eduai-border)", color: "var(--eduai-text)" }}
+                      >
+                        <option value="gemini" disabled={aiSettings.primary_provider === "gemini"}>Gemini</option>
+                        <option value="openai" disabled={aiSettings.primary_provider === "openai"}>OpenAI</option>
+                        <option value="sambanova" disabled={aiSettings.primary_provider === "sambanova"}>SambaNova</option>
+                        <option value="cohere" disabled={aiSettings.primary_provider === "cohere"}>Cohere</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    {aiSettings.providers.map((provider) => {
+                      const providerId = provider.id as AIProviderId;
+                      const models = availableModels[providerId] ?? [];
+                      return (
+                        <article key={provider.id} className="rounded-xl border p-4" style={{ borderColor: "var(--eduai-border)" }}>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="font-semibold">{provider.name}</h3>
+                              <p className="mt-1 text-xs" style={{ color: "var(--eduai-muted)" }}>
+                                {provider.configured ? `Credential: ${provider.masked_credential}` : "Credential not configured"}
+                              </p>
+                            </div>
+                            <span className="rounded-full px-2.5 py-1 text-xs" style={{ background: "var(--eduai-accent-soft)", color: "var(--eduai-accent-strong)" }}>
+                              {provider.status.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <label className="mt-4 flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={provider.enabled}
+                              onChange={(event) => updateAIProvider(providerId, { enabled: event.target.checked })}
+                              className="h-4 w-4 accent-[var(--eduai-accent)]"
+                            />
+                            Enable {provider.name}
+                          </label>
+                          <label className="mt-4 block text-sm">Selected model
+                            {models.length > 0 ? (
+                              <select
+                                value={provider.model}
+                                onChange={(event) => updateAIProvider(providerId, { model: event.target.value })}
+                                className="mt-2 block w-full rounded-lg border bg-transparent px-3 py-2"
+                                style={{ borderColor: "var(--eduai-border)", color: "var(--eduai-text)" }}
+                              >
+                                {!models.includes(provider.model) && provider.model && <option value={provider.model}>{provider.model} (configured)</option>}
+                                {!provider.model && <option value="">Choose a discovered model</option>}
+                                {models.map((model) => <option key={model} value={model}>{model}</option>)}
+                              </select>
+                            ) : (
+                              <span className="mt-2 block truncate rounded-lg border px-3 py-2 font-mono text-xs" style={{ borderColor: "var(--eduai-border)" }}>
+                                {provider.model || "No model selected — the first compatible model will be auto-selected on the next AI request"}
+                              </span>
+                            )}
+                          </label>
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              disabled={aiSettingsBusy}
+                              onClick={() => void testAIProvider(providerId)}
+                              className="rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
+                              style={{ borderColor: "var(--eduai-border)" }}
+                            >
+                              {aiSettingsBusy ? "Checking…" : "Check connectivity & models"}
+                            </button>
+                            <span className="text-xs" style={{ color: "var(--eduai-muted)" }}>
+                              {provider.usage.request_count} requests · {provider.usage.error_count} errors · {provider.usage.average_response_time_ms} ms avg
+                            </span>
+                          </div>
+                          {provider.last_error && <p role="status" className="mt-3 text-xs text-rose-600">{provider.last_error}</p>}
+                        </article>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={aiSettingsBusy}
+                      onClick={() => void saveAISettings()}
+                      className="rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+                      style={{ background: "var(--eduai-accent)", color: "#fff" }}
+                    >
+                      Save provider settings
+                    </button>
+                    {aiSettingsMessage && <p role="status" className="text-sm text-emerald-700">{aiSettingsMessage}</p>}
+                    {aiSettingsError && <p role="alert" className="text-sm text-rose-600">{aiSettingsError}</p>}
+                  </div>
+                  <p className="mt-4 text-xs" style={{ color: "var(--eduai-muted)" }}>
+                    Failover is used only for temporary service failures, timeouts, connection issues, and rate limits. Invalid credentials and quota/billing errors are shown without retrying another provider.
+                  </p>
+                </>
+              ) : (
+                <p role={aiSettingsError ? "alert" : "status"} className="mt-4 text-sm" style={{ color: aiSettingsError ? "#e11d48" : "var(--eduai-muted)" }}>
+                  {aiSettingsError || "Loading provider settings…"}
+                </p>
+              )}
+            </section>
+          )}
+
           <section aria-labelledby="appearance-title" className="eduai-surface-panel rounded-2xl border p-5 sm:p-7" style={cardStyle}>
             <h2 id="appearance-title" className="text-xl font-semibold">Appearance and themes</h2>
             <p className="mt-1 text-sm" style={{ color: "var(--eduai-muted)" }}>

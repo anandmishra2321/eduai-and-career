@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { Compass, Target, TrendingUp, DollarSign, Clock, Award } from "lucide-react";
+import { Compass, TrendingUp, DollarSign } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassPanel";
 import { CareerRecommendation } from "@/types";
 import { counterAnimation, progressBar } from "@/lib/animations";
@@ -55,12 +55,7 @@ export function CareerCard({ career, onClick }: CareerCardProps) {
               {career.recommendation_score}%
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs font-mono text-slate-400 mb-1">CONFIDENCE</div>
-            <div className="text-sm font-mono text-cyan-300">
-              {(career.model_confidence * 100).toFixed(0)}%
-            </div>
-          </div>
+          <div className="text-right text-xs font-mono text-slate-400">AI fit estimate</div>
         </div>
 
         {/* Progress Bar */}
@@ -74,6 +69,7 @@ export function CareerCard({ career, onClick }: CareerCardProps) {
 
         {/* Roadmap Summary */}
         <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20">
+          <p className="mb-2 text-xs text-slate-300">{career.fit_reason}</p>
           <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
             {career.roadmap_summary}
           </p>
@@ -81,7 +77,7 @@ export function CareerCard({ career, onClick }: CareerCardProps) {
 
         {/* Key Prerequisites */}
         <div className="space-y-2">
-          <div className="text-xs font-mono text-slate-400 uppercase">Required Skills</div>
+          <div className="text-xs font-mono text-slate-400 uppercase">Prerequisites</div>
           <div className="flex flex-wrap gap-1.5">
             {career.key_prerequisites.slice(0, 4).map((skill, index) => (
               <span

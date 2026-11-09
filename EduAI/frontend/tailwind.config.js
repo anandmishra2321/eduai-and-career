@@ -8,6 +8,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
       colors: {
         cyber: {
           void: "#030712",
@@ -51,4 +55,3 @@ module.exports = {
   },
   plugins: [],
 };
-

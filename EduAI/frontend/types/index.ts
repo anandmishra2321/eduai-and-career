@@ -39,39 +39,31 @@ export interface AuthResponse {
 export interface AcademicPredictionRequest {
   study_hours: number;
   attendance: number;
-  resources?: number;
-  extracurricular?: number;
-  motivation?: number;
-  internet?: number;
-  gender?: number;
-  age?: number;
-  learning_style?: number;
-  online_courses?: number;
-  discussions?: number;
-  assignment_completion?: number;
-  exam_score?: number;
-  edutech?: number;
-  stress_level?: number;
+  assignments: number;
+  internal_marks: number;
+  test_score: number;
 }
 
 export interface AcademicPredictionResponse {
   predicted_final_marks: number;
   performance_level: "Exceptional" | "Proficient" | "Average" | "At Risk";
-  confidence: number;
+  prediction_method: string;
   risk_factors: string[];
   recommendations: string[];
-  feature_contributions: Record<string, number>;
 }
 
 // -------------------------------------------------------------
 // Career Intelligence Types
 // -------------------------------------------------------------
+export type AIProviderId = "gemini" | "openai" | "sambanova" | "cohere";
+
 export interface CareerRecommendationRequest {
   education_level: string;
   specialization: string;
   skills: string[];
   certifications: string[];
   cgpa_percentage: number;
+  consent_to_ai_processing?: boolean;
   intelligences?: {
     linguistic?: number;
     musical?: number;
@@ -87,12 +79,29 @@ export interface CareerRecommendationRequest {
 export interface CareerRecommendation {
   career_title: string;
   recommendation_score: number; // 0 - 100
-  model_confidence: number;     // 0 - 1
   category: string;
+  fit_reason: string;
   key_prerequisites: string[];
-  market_demand: "High" | "Very High" | "Emerging" | "Stable";
+  skills_to_build: string[];
+  market_demand: string;
   median_salary_range: string;
   roadmap_summary: string;
+}
+
+export interface JobRoleRecommendationRequest {
+  query: string;
+  location?: string;
+  education_level?: string;
+  skills?: string[];
+  certifications?: string[];
+  consent_to_ai_processing: boolean;
+}
+
+export interface JobRoleRecommendation {
+  title: string;
+  fit_reason: string;
+  skills_to_build: string[];
+  search_query: string;
 }
 
 export interface CareerRoadmapPhase {
@@ -171,6 +180,9 @@ export interface AgentMessage {
   sender: "user" | "agent" | "system";
   text: string;
   timestamp: string;
+  conversation_id?: string;
+  provider?: AIProviderId;
+  model?: string;
   suggested_actions?: string[];
   tool_executed?: string;
   tool_result?: Record<string, unknown>;

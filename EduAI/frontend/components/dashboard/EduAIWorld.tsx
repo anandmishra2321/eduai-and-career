@@ -39,7 +39,16 @@ import { VoiceState } from "@/components/ui/VoiceButton";
 import { useThemePreferences } from "@/components/providers/ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
-import { AcademicPredictionResponse, CareerRecommendation, DocumentSummary, QuizQuestion, QuizResult, SkillNode } from "@/types";
+import {
+  AcademicPredictionResponse,
+  AIProviderId,
+  CareerRecommendation,
+  DocumentSummary,
+  JobRoleRecommendation,
+  QuizQuestion,
+  QuizResult,
+  SkillNode,
+} from "@/types";
 
 const EduAICanvas = dynamic(
   () => import("@/components/3d/EduAICanvas").then((mod) => mod.EduAICanvas),
@@ -50,15 +59,6 @@ const LearningLabCanvas = dynamic(
   () => import("@/components/3d/LearningLab").then((mod) => mod.LearningLabCanvas),
   { ssr: false, loading: () => <div className="h-[600px] animate-pulse rounded-2xl bg-slate-900/50" /> }
 );
-
-function safeExternalUrl(value: string): string | null {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
-  } catch {
-    return null;
-  }
-}
 
 type ActiveNode =
   | "overview"
@@ -104,8 +104,9 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
   // Academic Prediction State
   const [studyHours, setStudyHours] = useState("");
   const [attendance, setAttendance] = useState("");
-  const [examScore, setExamScore] = useState("");
-  const [assignmentCompletion, setAssignmentCompletion] = useState("");
+  const [assignments, setAssignments] = useState("");
+  const [internalMarks, setInternalMarks] = useState("");
+  const [testScore, setTestScore] = useState("");
   const [isPredicting, setIsPredicting] = useState(false);
   const [academicResult, setAcademicResult] = useState<AcademicPredictionResponse | null>(null);
 
@@ -117,18 +118,35 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
   const [careerCertifications, setCareerCertifications] = useState("");
   const [isCalculatingCareer, setIsCalculatingCareer] = useState(false);
   const [careerRecommendations, setCareerRecommendations] = useState<CareerRecommendation[]>([]);
+  const [careerAiConsent, setCareerAiConsent] = useState(false);
+  const [careerRecommendationInfo, setCareerRecommendationInfo] = useState<{
+    method: string;
+    provider: AIProviderId | null;
+    model: string | null;
+    disclaimer: string;
+  } | null>(null);
 
   // Quiz State
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
   const [quizTopic, setQuizTopic] = useState("");
+  const [quizMode, setQuizMode] = useState<"random" | "document" | null>(null);
+  const [randomQuizCount, setRandomQuizCount] = useState("10");
+  const [randomQuizDifficulty, setRandomQuizDifficulty] = useState<"Any" | "Easy" | "Medium" | "Hard">("Any");
+  const [documentQuizCount, setDocumentQuizCount] = useState("5");
+  const [selectedQuizDocumentId, setSelectedQuizDocumentId] = useState("");
   const [quizId, setQuizId] = useState("");
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [quizExplanations, setQuizExplanations] = useState<Record<string, Awaited<ReturnType<typeof api.quiz.explainAnswer>>>>({});
+  const [explainingQuestionId, setExplainingQuestionId] = useState("");
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [resumeAnalysis, setResumeAnalysis] = useState<Awaited<ReturnType<typeof api.resume.analyze>> | null>(null);
   const [resumeBusy, setResumeBusy] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeAISuggestions, setResumeAISuggestions] = useState("");
+  const [resumeAIBusy, setResumeAIBusy] = useState(false);
   const [interviewRole, setInterviewRole] = useState("");
   const [interviewType, setInterviewType] = useState<"Technical" | "HR" | "Behavioral">("Technical");
   const [interviewSessionId, setInterviewSessionId] = useState("");
@@ -151,12 +169,18 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
   const [agentTools, setAgentTools] = useState<Array<{ name: string; description: string }>>([]);
   const [agentResponse, setAgentResponse] = useState("");
   const [agentBusy, setAgentBusy] = useState(false);
+  const [agentConversationId, setAgentConversationId] = useState<string>();
   const [searchQuery, setSearchQuery] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [activeDocumentId, setActiveDocumentId] = useState("");
   const [documentQuestion, setDocumentQuestion] = useState("");
-  const [documentAnswer, setDocumentAnswer] = useState<{ answer: string; citations: Array<{ page: number; excerpt: string }> } | null>(null);
+  const [documentAnswer, setDocumentAnswer] = useState<{
+    answer: string;
+    citations: Array<{ page: number; excerpt: string }>;
+    provider?: AIProviderId | "local";
+    model?: string;
+  } | null>(null);
   const [documentBusy, setDocumentBusy] = useState(false);
   const [skills, setSkills] = useState<SkillNode[]>([]);
   const [skillDrafts, setSkillDrafts] = useState<Record<string, number>>({});
@@ -164,7 +188,8 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
   const [savingSkillId, setSavingSkillId] = useState("");
   const [jobQuery, setJobQuery] = useState("");
   const [jobLocation, setJobLocation] = useState("");
-  const [jobs, setJobs] = useState<Awaited<ReturnType<typeof api.jobs.search>>["jobs"]>([]);
+  const [jobSuggestions, setJobSuggestions] = useState<JobRoleRecommendation[]>([]);
+  const [jobAiConsent, setJobAiConsent] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [goals, setGoals] = useState<Awaited<ReturnType<typeof api.goals.list>>>([]);
   const [goalsLoading, setGoalsLoading] = useState(false);
@@ -180,8 +205,6 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     { id: "quiz", label: "Quiz intelligence", icon: Award },
     { id: "skills", label: "Skill intelligence", icon: Network },
     { id: "career", label: "Career roadmap", icon: Compass },
-    { id: "resume", label: "Resume center", icon: FileText },
-    { id: "interview", label: "Mock interview", icon: Mic },
     { id: "habits", label: "Goals & habits", icon: Calendar },
     { id: "goals", label: "Goals", icon: Target },
     { id: "jobs", label: "Jobs", icon: BriefcaseBusiness },
@@ -204,12 +227,47 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     setSearchQuery("");
   };
 
+  const handleAskDocumentAI = async () => {
+    const question = documentQuestion.trim();
+    if (!activeDocumentId || question.length < 2) {
+      setActionError("Select a document and enter a question before asking the AI assistant.");
+      return;
+    }
+    setDocumentBusy(true);
+    setActionError(null);
+    try {
+      setDocumentAnswer(await api.learning.askDocumentWithAI(activeDocumentId, question));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "AI document question failed.");
+    } finally {
+      setDocumentBusy(false);
+    }
+  };
+
+  const handleSummarizeDocumentLocally = async () => {
+    if (!activeDocumentId) {
+      setActionError("Select a document before generating a summary.");
+      return;
+    }
+    setDocumentBusy(true);
+    setActionError(null);
+    try {
+      const result = await api.learning.summarizeDocument(activeDocumentId);
+      setDocumentAnswer({ answer: result.summary, citations: [], provider: result.provider, model: result.model });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Local document summary failed.");
+    } finally {
+      setDocumentBusy(false);
+    }
+  };
+
   const handlePredictAcademic = async () => {
-    const values = [studyHours, attendance, examScore, assignmentCompletion].map((value) => Number(value));
-    if ([studyHours, attendance, examScore, assignmentCompletion].some((value) => !value.trim())
-      || values.some((value) => !Number.isFinite(value) || value < 0)
-      || values[0] > 168 || values[1] > 100 || values[2] > 100 || values[3] > 100) {
-      setActionError("Enter weekly study hours and percentage values (0–100) before requesting a prediction.");
+    const requiredValues = [studyHours, attendance, assignments, internalMarks, testScore];
+    const values = requiredValues.map((value) => Number(value));
+    if (requiredValues.some((value) => !value.trim())
+      || values.some((value) => !Number.isFinite(value) || value < 0 || value > 100)
+      || values[0] > 24) {
+      setActionError("Enter daily study hours (0–24) and valid marks/percentages (0–100) for all model inputs.");
       return;
     }
     setIsPredicting(true);
@@ -219,14 +277,30 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
       const res = await api.performance.predict({
         study_hours: values[0],
         attendance: values[1],
-        exam_score: values[2],
-        assignment_completion: values[3],
+        assignments: values[2],
+        internal_marks: values[3],
+        test_score: values[4],
       });
       setAcademicResult(res);
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Performance prediction failed.");
     } finally {
       setIsPredicting(false);
+    }
+  };
+
+  const handleResumeAISuggestions = async () => {
+    if (!resumeFile) return;
+    setResumeAIBusy(true);
+    setActionError(null);
+    setResumeAISuggestions("");
+    try {
+      const result = await api.resume.aiSuggestions(resumeFile);
+      setResumeAISuggestions(`${result.suggestions}\n\nGenerated by ${result.provider} · ${result.model}`);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "AI resume suggestions failed.");
+    } finally {
+      setResumeAIBusy(false);
     }
   };
 
@@ -238,6 +312,10 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
       setActionError("Enter your education level, career direction, and CGPA percentage (0–100) before requesting recommendations.");
       return;
     }
+    if (!careerAiConsent) {
+      setActionError("Consent to AI processing before requesting personalized career guidance.");
+      return;
+    }
     setIsCalculatingCareer(true);
     setActionError(null);
     try {
@@ -247,8 +325,15 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
         skills: careerSkills.split(",").map((skill) => skill.trim()).filter(Boolean),
         certifications: careerCertifications.split(",").map((item) => item.trim()).filter(Boolean),
         cgpa_percentage: cgpaPercentage,
+        consent_to_ai_processing: true,
       });
       setCareerRecommendations(res.top_recommendations ?? []);
+      setCareerRecommendationInfo({
+        method: res.method,
+        provider: res.provider,
+        model: res.model,
+        disclaimer: res.disclaimer,
+      });
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : "Career recommendation failed.");
     } finally {
@@ -279,15 +364,26 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
   const handleJobSearch = async () => {
     const query = jobQuery.trim();
     if (query.length < 2) {
-      setActionError("Enter at least two characters to search jobs.");
+      setActionError("Enter at least two characters for job-role suggestions.");
+      return;
+    }
+    if (!jobAiConsent) {
+      setActionError("Consent to AI processing before requesting personalized job-role suggestions.");
       return;
     }
     setJobsLoading(true);
     setActionError(null);
-    setJobs([]);
+    setJobSuggestions([]);
     try {
-      const result = await api.jobs.search(query, jobLocation.trim() || undefined);
-      setJobs(result.jobs);
+      const result = await api.jobs.recommend({
+        query,
+        location: jobLocation.trim(),
+        education_level: profile?.education_level?.trim() || "",
+        skills: careerSkills.split(",").map((skill) => skill.trim()).filter(Boolean),
+        certifications: careerCertifications.split(",").map((item) => item.trim()).filter(Boolean),
+        consent_to_ai_processing: true,
+      });
+      setJobSuggestions(result.roles);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Job search failed.");
     } finally {
@@ -321,21 +417,23 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     }
   };
 
-  const handleGenerateQuiz = async () => {
-    const topic = quizTopic.trim();
-    if (topic.length < 2) {
-      setActionError("Enter a quiz topic with at least two characters.");
+  const handleGenerateRandomQuiz = async () => {
+    const questionCount = Number(randomQuizCount);
+    if (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > 5000) {
+      setActionError("Choose a question count from 1 to 5,000.");
       return;
     }
     setIsGeneratingQuiz(true);
     setActionError(null);
     setQuizResult(null);
+    setQuizExplanations({});
     try {
-      const result = await api.quiz.generate({ topic, difficulty: "Medium", question_count: 5 });
+      const result = await api.quiz.generateRandomBank(questionCount, randomQuizDifficulty);
       if (!result.quiz_id || result.questions.length === 0) {
         throw new Error("The quiz service returned no questions.");
       }
       setQuizId(result.quiz_id);
+      setQuizTopic(`Random question bank · ${randomQuizDifficulty}`);
       setQuizQuestions(result.questions);
       setQuizAnswers({});
       setCurrentQuizIndex(0);
@@ -344,6 +442,48 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     } finally {
       setIsGeneratingQuiz(false);
     }
+  };
+
+  const handleGenerateDocumentQuiz = async () => {
+    const questionCount = Number(documentQuizCount);
+    const selectedDocument = documents.find((document) => document.id === selectedQuizDocumentId);
+    if (!selectedDocument) {
+      setActionError("Upload or select a study document first.");
+      return;
+    }
+    if (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > 10) {
+      setActionError("Choose a question count from 1 to 10.");
+      return;
+    }
+    setIsGeneratingQuiz(true);
+    setActionError(null);
+    setQuizResult(null);
+    setQuizExplanations({});
+    try {
+      const result = await api.quiz.generateFromDocument(selectedDocument.id, questionCount);
+      if (!result.quiz_id || result.questions.length === 0) {
+        throw new Error("The document quiz service returned no questions.");
+      }
+      setQuizId(result.quiz_id);
+      setQuizTopic(selectedDocument.filename);
+      setQuizQuestions(result.questions);
+      setQuizAnswers({});
+      setCurrentQuizIndex(0);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Document quiz generation failed.");
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
+  };
+
+  const resetQuiz = () => {
+    setQuizQuestions([]);
+    setQuizResult(null);
+    setQuizId("");
+    setQuizAnswers({});
+    setQuizExplanations({});
+    setCurrentQuizIndex(0);
+    setQuizMode(null);
   };
 
   const handleSubmitQuiz = async (answers: Record<string, number>) => {
@@ -362,11 +502,27 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     }
   };
 
+  const handleExplainQuizAnswer = async (questionId: string) => {
+    if (!quizId || !quizResult) return;
+    setExplainingQuestionId(questionId);
+    setActionError(null);
+    try {
+      const result = await api.quiz.explainAnswer(quizId, questionId);
+      setQuizExplanations((current) => ({ ...current, [questionId]: result }));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "AI quiz explanation failed.");
+    } finally {
+      setExplainingQuestionId("");
+    }
+  };
+
   const handleResumeUpload = async (file: File | undefined) => {
     if (!file) return;
     setResumeBusy(true);
     setActionError(null);
     setResumeAnalysis(null);
+    setResumeAISuggestions("");
+    setResumeFile(file);
     try {
       const result = await api.resume.analyze(file);
       if (!Number.isFinite(result.ats_score)) {
@@ -434,8 +590,9 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     try {
       const summary = await api.learning.uploadDocument(file);
       if (!summary.id) throw new Error("The document service returned no document identifier.");
-      setDocuments((current) => [summary, ...current]);
+      setDocuments((current) => [summary, ...current.filter((document) => document.id !== summary.id)]);
       setActiveDocumentId(summary.id);
+      setSelectedQuizDocumentId(summary.id);
       setDocumentAnswer(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Document upload failed.");
@@ -487,7 +644,8 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
     setActionError(null);
     setActiveNode("agent");
     try {
-      const result = await api.agent.execute(prompt);
+      const result = await api.agent.execute(prompt, undefined, agentConversationId);
+      setAgentConversationId(result.conversation_id);
       setAgentResponse(result.text);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "AI assistant request failed.");
@@ -578,6 +736,30 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
         }
       });
 
+    return () => { cancelled = true; };
+  }, [activeNode, isDemo]);
+
+  useEffect(() => {
+    if ((activeNode !== "learning" && activeNode !== "quiz") || isDemo) return;
+    let cancelled = false;
+    void api.learning.listDocuments()
+      .then((items) => {
+        if (cancelled) return;
+        setDocuments(items);
+        setActiveDocumentId((current) =>
+          current && items.some((document) => document.id === current)
+            ? current
+            : items[0]?.id ?? ""
+        );
+        setSelectedQuizDocumentId((current) =>
+          current && items.some((document) => document.id === current)
+            ? current
+            : items[0]?.id ?? ""
+        );
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setActionError(error instanceof Error ? error.message : "Documents could not be loaded.");
+      });
     return () => { cancelled = true; };
   }, [activeNode, isDemo]);
 
@@ -1038,6 +1220,7 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                                 <text x={point.x} y="211" textAnchor="middle" fill="var(--eduai-muted)" fontSize="9">Run {index + 1}</text>
                               </g>
                             ))}
+                            {resumeAISuggestions && <p className="whitespace-pre-wrap border-t border-white/10 pt-3 text-cyan-100">{resumeAISuggestions}</p>}
                           </>
                         );
                       })()}
@@ -1201,17 +1384,18 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                 <div>
                   <h2 className="text-xl font-bold text-white">ACADEMIC TELEMETRY & PREDICTOR</h2>
                   <p className="text-xs text-slate-400 font-mono">
-                    Prediction service availability and model details are not verified in this frontend.
+                    Local trained score regressor · daily study hours, attendance, assignments, internal marks, and test score.
                   </p>
                 </div>
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
                 {[
-                  { label: "Weekly study hours", value: studyHours, setValue: setStudyHours, max: 168, suffix: "hours" },
+                  { label: "Daily study hours", value: studyHours, setValue: setStudyHours, max: 24, suffix: "hours" },
                   { label: "Attendance rate", value: attendance, setValue: setAttendance, max: 100, suffix: "%" },
-                  { label: "Exam / test score", value: examScore, setValue: setExamScore, max: 100, suffix: "%" },
-                  { label: "Assignment completion", value: assignmentCompletion, setValue: setAssignmentCompletion, max: 100, suffix: "%" },
+                  { label: "Assignments marks", value: assignments, setValue: setAssignments, max: 100, suffix: "%" },
+                  { label: "Internal marks", value: internalMarks, setValue: setInternalMarks, max: 100, suffix: "%" },
+                  { label: "Test score", value: testScore, setValue: setTestScore, max: 100, suffix: "%" },
                 ].map(({ label, value, setValue, max, suffix }) => (
                   <label key={label} className="space-y-2 text-xs font-mono text-slate-300">
                     <span>{label}</span>
@@ -1254,23 +1438,17 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                 {academicResult && (
                   <div className="mt-6 space-y-4">
                     <div className="p-4 rounded-xl bg-black/50 border border-cyan-500/25 text-center">
-                      <div className="text-xs text-slate-400 font-mono">PREDICTED FINAL SCORE</div>
+                      <div className="text-xs text-slate-400 font-mono">TRAINED MODEL PREDICTED FINAL MARKS</div>
                       <div className="text-4xl font-extrabold text-cyan-300 font-mono mt-1">
                         {academicResult.predicted_final_marks}%
                       </div>
                       <div className="text-xs text-emerald-400 font-mono mt-1">
-                        Classification: {academicResult.performance_level}
+                        Score band: {academicResult.performance_level}
                       </div>
                     </div>
 
-                    <div className="text-xs font-mono space-y-2">
-                      <div className="text-slate-400">FEATURE WEIGHTS:</div>
-                      {Object.entries(academicResult.feature_contributions || {}).map(([k, v]) => (
-                        <div key={k} className="flex justify-between items-center text-slate-300">
-                          <span>{k}</span>
-                          <span className="text-cyan-400">{(v * 100).toFixed(0)}%</span>
-                        </div>
-                      ))}
+                    <div className="text-xs font-mono text-slate-400">
+                      Prediction method: {academicResult.prediction_method}
                     </div>
 
                     <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200">
@@ -1389,7 +1567,9 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-white">CAREER INTELLIGENCE ENGINE</h2>
-                    <p className="text-xs text-slate-400 font-mono">Career recommendation API · availability not verified</p>
+                            <p className="text-xs text-slate-400 font-mono">
+                              AI-generated career fit guidance · not a validated prediction.
+                    </p>
                   </div>
                 </div>
 
@@ -1437,6 +1617,15 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                     aria-label="Certifications, comma separated"
                     className="w-full rounded-xl border border-amber-500/30 bg-black/50 px-3.5 py-2 text-xs text-white outline-none focus:border-amber-400 sm:col-span-2"
                   />
+                  <label className="flex items-start gap-2 text-[11px] leading-relaxed text-slate-300 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={careerAiConsent}
+                      onChange={(event) => setCareerAiConsent(event.target.checked)}
+                      className="mt-0.5 accent-amber-400"
+                    />
+                    I consent to sending my education, career direction, skills, certifications, and academic percentage to the configured AI provider for career guidance.
+                  </label>
                   <Button
                     variant="gold"
                     size="sm"
@@ -1447,6 +1636,14 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                   </Button>
                 </div>
               </div>
+
+              {careerRecommendationInfo && (
+                <p className="mb-4 text-xs text-slate-400">
+                  {careerRecommendationInfo.method}
+                  {careerRecommendationInfo.provider && ` · ${careerRecommendationInfo.provider} · ${careerRecommendationInfo.model}`}
+                  {" · "}{careerRecommendationInfo.disclaimer}
+                </p>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {careerRecommendations.map((career) => (
@@ -1467,10 +1664,11 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                         <div className="text-xl font-extrabold text-amber-300 font-mono">
                           {career.recommendation_score}%
                         </div>
-                        <div className="text-[10px] text-slate-400 font-mono">Recommendation Score</div>
+                        <div className="text-[10px] text-slate-400 font-mono">Fit estimate</div>
                       </div>
                     </div>
 
+                    <p className="text-xs text-slate-300 leading-relaxed">{career.fit_reason}</p>
                     <p className="text-xs text-slate-300 leading-relaxed">
                       {career.roadmap_summary}
                     </p>
@@ -1489,8 +1687,21 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                       </div>
                     </div>
 
+                    {career.skills_to_build.length > 0 && (
+                      <div className="space-y-1.5 font-mono text-xs">
+                        <div className="text-slate-400 text-[10px]">SKILLS TO BUILD:</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {career.skills_to_build.map((skill) => (
+                            <span key={skill} className="rounded border border-cyan-500/30 bg-cyan-950/40 px-2 py-0.5 text-[11px] text-cyan-200">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2 border-t border-amber-500/15 text-xs font-mono">
-                      <span className="text-slate-400">Demand: <span className="text-emerald-400 font-semibold">{career.market_demand}</span></span>
+                      <span className="text-slate-400">Demand: <span className="text-slate-300">{career.market_demand}</span></span>
                       <span className="text-amber-300">{career.median_salary_range}</span>
                     </div>
                   </div>
@@ -1554,10 +1765,23 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                   QUERY
                 </Button>
               </form>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="ghost" size="sm" isLoading={documentBusy} disabled={!activeDocumentId || documentQuestion.trim().length < 2} onClick={() => void handleAskDocumentAI()}>
+                  Ask with AI
+                </Button>
+                <Button type="button" variant="ghost" size="sm" isLoading={documentBusy} disabled={!activeDocumentId} onClick={() => void handleSummarizeDocumentLocally()}>
+                  Summarize locally
+                </Button>
+                <span className="self-center text-[10px] text-slate-400">Summarization runs locally; Ask with AI sends material to the configured provider.</span>
+              </div>
 
               {documentAnswer ? (
                 <div className="space-y-3 rounded-xl border border-cyan-500/25 bg-black/30 p-4">
-                  <div className="flex items-center gap-2 text-cyan-400"><Sparkles className="h-4 w-4" /><span className="font-semibold">Document service response</span></div>
+                  <div className="flex items-center gap-2 text-cyan-400"><Sparkles className="h-4 w-4" /><span className="font-semibold">
+                    {documentAnswer.provider
+                      ? `${documentAnswer.provider === "local" ? "Local summary" : "AI response"} · ${documentAnswer.provider} · ${documentAnswer.model}`
+                      : "Document service response"}
+                  </span></div>
                   <p className="text-sm leading-relaxed text-slate-200">{documentAnswer.answer}</p>
                   {documentAnswer.citations.map((citation) => (
                     <blockquote key={`${citation.page}-${citation.excerpt}`} className="rounded-lg border border-cyan-500/20 p-2.5 text-xs text-slate-300">
@@ -1578,28 +1802,108 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
         {activeNode === "quiz" && (
           <GlassPanel glow="cyan" className="p-6 max-w-2xl mx-auto space-y-6">
             <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-cyan-400">Backend-connected quiz</p>
+              <p className="text-xs font-mono uppercase tracking-wider text-cyan-400">Two practice modes</p>
               <h3 className="mt-1 text-lg font-bold text-white">Quiz intelligence</h3>
-              <p className="mt-1 text-xs text-slate-400">Questions and results come from the configured quiz API.</p>
+              <p className="mt-1 text-xs text-slate-400">Choose a random placement question set or generate questions from your study material.</p>
             </div>
 
-            {!quizQuestions.length && (
-              <form onSubmit={(event) => { event.preventDefault(); void handleGenerateQuiz(); }} className="flex flex-col gap-3 sm:flex-row">
-                <label className="sr-only" htmlFor="quiz-topic">Quiz topic</label>
+            {!quizQuestions.length && !quizMode && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => { setQuizMode("random"); setActionError(null); }}
+                  className="rounded-2xl border border-cyan-500/30 bg-black/30 p-4 text-left transition hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                >
+                  <span className="block font-semibold text-white">Random question bank</span>
+                  <span className="mt-1 block text-xs text-slate-400">Select up to 5,000 questions from the local placement workbook.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setQuizMode("document"); setActionError(null); }}
+                  className="rounded-2xl border border-cyan-500/30 bg-black/30 p-4 text-left transition hover:border-cyan-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                >
+                  <span className="block font-semibold text-white">Quiz from study material</span>
+                  <span className="mt-1 block text-xs text-slate-400">Generate focused questions grounded in an uploaded document.</span>
+                </button>
+              </div>
+            )}
+
+            {!quizQuestions.length && quizMode === "random" && (
+              <form onSubmit={(event) => { event.preventDefault(); void handleGenerateRandomQuiz(); }} className="space-y-3">
+                <label className="block text-xs font-medium text-slate-300" htmlFor="random-quiz-count">Number of questions (1–5,000)</label>
                 <input
-                  id="quiz-topic"
-                  type="text"
-                  value={quizTopic}
-                  onChange={(event) => setQuizTopic(event.target.value)}
+                  id="random-quiz-count"
+                  type="number"
+                  min={1}
+                  max={5000}
+                  step={1}
                   required
-                  minLength={2}
-                  maxLength={120}
-                  placeholder="Enter a topic"
-                  className="min-w-0 flex-1 rounded-xl border border-cyan-500/30 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  value={randomQuizCount}
+                  onChange={(event) => setRandomQuizCount(event.target.value)}
+                  className="w-full rounded-xl border border-cyan-500/30 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                 />
-                <Button type="submit" variant="primary" size="sm" isLoading={isGeneratingQuiz}>
-                  Generate quiz
-                </Button>
+                <label className="block text-xs font-medium text-slate-300" htmlFor="random-quiz-difficulty">Difficulty</label>
+                <select
+                  id="random-quiz-difficulty"
+                  value={randomQuizDifficulty}
+                  onChange={(event) => setRandomQuizDifficulty(event.target.value as "Any" | "Easy" | "Medium" | "Hard")}
+                  className="w-full rounded-xl border border-cyan-500/30 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                >
+                  <option value="Any">Any difficulty</option>
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+                <p className="text-xs text-slate-400">Questions are sampled without repeats. This local mode does not send data to an AI provider.</p>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary" size="sm" isLoading={isGeneratingQuiz}>Start random quiz</Button>
+                  <button type="button" onClick={resetQuiz} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-slate-300">Back</button>
+                </div>
+              </form>
+            )}
+
+            {!quizQuestions.length && quizMode === "document" && (
+              <form onSubmit={(event) => { event.preventDefault(); void handleGenerateDocumentQuiz(); }} className="space-y-3">
+                <label className="block text-xs font-medium text-slate-300" htmlFor="quiz-document">Study document</label>
+                <select
+                  id="quiz-document"
+                  value={selectedQuizDocumentId}
+                  onChange={(event) => setSelectedQuizDocumentId(event.target.value)}
+                  className="w-full rounded-xl border border-cyan-500/30 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                >
+                  <option value="">Select an uploaded document</option>
+                  {documents.map((document) => <option key={document.id} value={document.id}>{document.filename}</option>)}
+                </select>
+                <label className="block text-xs font-medium text-slate-300" htmlFor="quiz-document-upload">Or upload study material (PDF, DOCX, or TXT)</label>
+                <input
+                  id="quiz-document-upload"
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  disabled={documentBusy}
+                  onChange={(event) => {
+                    void handleDocumentUpload(event.target.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                  className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/15 file:px-3 file:py-2 file:text-cyan-200 disabled:opacity-50"
+                />
+                {documentBusy && <p role="status" className="text-xs text-slate-400">Uploading and processing material…</p>}
+                <label className="block text-xs font-medium text-slate-300" htmlFor="document-quiz-count">Number of questions (1–10)</label>
+                <input
+                  id="document-quiz-count"
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={1}
+                  required
+                  value={documentQuizCount}
+                  onChange={(event) => setDocumentQuizCount(event.target.value)}
+                  className="w-full rounded-xl border border-cyan-500/30 bg-black/40 px-4 py-2.5 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                />
+                <p className="text-xs text-slate-400">The selected document text is sent to your configured AI provider to create the quiz.</p>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary" size="sm" isLoading={isGeneratingQuiz} disabled={documentBusy || !selectedQuizDocumentId}>Generate from document</Button>
+                  <button type="button" onClick={resetQuiz} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-slate-300">Back</button>
+                </div>
               </form>
             )}
 
@@ -1651,9 +1955,38 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                     {quizResult.recommended_actions.map((action) => <li key={action}>{action}</li>)}
                   </ul>
                 )}
+                <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+                  <p className="text-xs text-slate-400">Ask the configured AI provider to explain each submitted answer. Question and answer data will be sent to that provider.</p>
+                  {quizQuestions.map((question) => {
+                    const explanation = quizExplanations[question.id];
+                    return (
+                      <article key={question.id} className="rounded-xl border border-white/10 p-3">
+                        <p className="text-sm text-slate-200">{question.question}</p>
+                        {explanation ? (
+                          <div className="mt-2 space-y-1 text-xs">
+                            <p className={explanation.is_correct ? "text-emerald-300" : "text-amber-300"}>
+                              {explanation.is_correct ? "Correct" : `Correct answer: ${explanation.correct_answer}`}
+                            </p>
+                            <p className="whitespace-pre-wrap text-slate-300">{explanation.explanation}</p>
+                            <p className="text-slate-500">{explanation.provider} · {explanation.model}</p>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={Boolean(explainingQuestionId)}
+                            onClick={() => void handleExplainQuizAnswer(question.id)}
+                            className="mt-2 rounded-lg border border-cyan-400/30 px-3 py-1.5 text-xs text-cyan-200 disabled:opacity-50"
+                          >
+                            {explainingQuestionId === question.id ? "Generating explanation…" : "Explain with AI"}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
-                  onClick={() => { setQuizQuestions([]); setQuizResult(null); setQuizId(""); setQuizAnswers({}); setCurrentQuizIndex(0); }}
+                  onClick={resetQuiz}
                   className="mt-4 rounded-lg border border-white/15 px-3 py-2 text-xs"
                 >
                   Create another quiz
@@ -1769,28 +2102,37 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
         {activeNode === "jobs" && (
           <GlassPanel glow="cyan" className="space-y-5 p-6">
             <div>
-              <h2 className="text-xl font-bold text-white">JOB SEARCH</h2>
-              <p className="text-xs text-slate-400">Listings are shown only when returned by the connected job-search API.</p>
+              <h2 className="text-xl font-bold text-white">AI JOB-ROLE IDEAS</h2>
+              <p className="text-xs text-slate-400">Personalized role suggestions, not live vacancies. Search externally to see current listings.</p>
             </div>
             <form className="grid gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); void handleJobSearch(); }}>
-              <input aria-label="Job title or keywords" required minLength={2} value={jobQuery} onChange={(event) => setJobQuery(event.target.value)} placeholder="Job title or keywords" className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" />
+              <input aria-label="Career interest or job keywords" required minLength={2} value={jobQuery} onChange={(event) => setJobQuery(event.target.value)} placeholder="Career interest or job keywords" className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" />
               <input aria-label="Location (optional)" value={jobLocation} onChange={(event) => setJobLocation(event.target.value)} placeholder="Location (optional)" className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white" />
-              <Button type="submit" isLoading={jobsLoading}>Search jobs</Button>
+              <Button type="submit" isLoading={jobsLoading}>Suggest roles</Button>
             </form>
-            {jobsLoading ? <p role="status" className="text-sm text-slate-400">Searching…</p> : jobs.length === 0 ? (
-              <p className="rounded-xl border border-white/10 p-4 text-sm text-slate-400">No results to display. Search to request current results from the service.</p>
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-300">
+              <input
+                type="checkbox"
+                checked={jobAiConsent}
+                onChange={(event) => setJobAiConsent(event.target.checked)}
+                className="mt-0.5 accent-cyan-400"
+              />
+              I consent to sending my role interest, location, education, skills, and certifications to the configured AI provider for role suggestions.
+            </label>
+            {jobsLoading ? <p role="status" className="text-sm text-slate-400">Generating role ideas…</p> : jobSuggestions.length === 0 ? (
+              <p className="rounded-xl border border-white/10 p-4 text-sm text-slate-400">Enter a role or interest and consent to receive AI-generated suggestions.</p>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
-                {jobs.map((job) => {
-                  const applyUrl = safeExternalUrl(job.apply_url);
+                {jobSuggestions.map((role) => {
+                  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${role.search_query} ${jobLocation.trim()}`)}`;
                   return (
-                    <article key={job.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
-                      <h3 className="font-semibold text-white">{job.title}</h3>
-                      <p className="mt-1 text-sm text-slate-300">{job.company} · {job.location}</p>
-                      <p className="mt-2 text-xs text-slate-400">{job.salary_estimate || "Salary not provided"} · Match score returned by API: {job.match_percentage}%</p>
-                      {job.matched_skills.length > 0 && <p className="mt-2 text-xs text-emerald-300">Matched: {job.matched_skills.join(", ")}</p>}
-                      {job.missing_skills.length > 0 && <p className="mt-1 text-xs text-amber-300">Skills to develop: {job.missing_skills.join(", ")}</p>}
-                      {applyUrl && <a href={applyUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-cyan-300 underline focus-visible:outline focus-visible:outline-2">View application</a>}
+                    <article key={role.title} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                      <h3 className="font-semibold text-white">{role.title}</h3>
+                      <p className="mt-2 text-sm text-slate-300">{role.fit_reason}</p>
+                      {role.skills_to_build.length > 0 && <p className="mt-2 text-xs text-amber-300">Skills to build: {role.skills_to_build.join(", ")}</p>}
+                      <a href={searchUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-cyan-300 underline focus-visible:outline focus-visible:outline-2">
+                        Search real listings
+                      </a>
                     </article>
                   );
                 })}
@@ -1811,7 +2153,7 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
           <GlassPanel glow="cyan" className="space-y-4 p-4 md:p-6">
             <div>
               <h2 className="text-xl font-bold text-white">3D LEARNING LAB</h2>
-              <p className="text-xs text-slate-400">Preset human-heart learning demo; explanations and quiz content are not AI-generated.</p>
+              <p className="text-xs text-slate-400">Explore heart structures, follow a blood-flow walkthrough, or test what you learned. The model is illustrative, not clinical.</p>
             </div>
             <LearningLabCanvas reducedMotion={preferences.reducedMotion} />
           </GlassPanel>
@@ -1848,6 +2190,17 @@ export function EduAIWorld({ onLogout }: { onLogout?: () => void }) {
                     className="mt-2 block w-full text-xs file:mr-2 file:rounded-md file:border-0 file:bg-cyan-400 file:px-3 file:py-2 file:text-slate-950"
                   />
                 </label>
+                <button
+                  type="button"
+                  disabled={!resumeFile || resumeBusy || resumeAIBusy}
+                  onClick={() => void handleResumeAISuggestions()}
+                  className="mt-3 w-full rounded-lg border border-cyan-500/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-50"
+                >
+                  {resumeAIBusy ? "Generating suggestions…" : "Get AI improvement suggestions"}
+                </button>
+                <p className="mt-2 text-left text-[10px] leading-relaxed text-slate-500">
+                  This optional action sends resume text to the configured cloud AI provider. Local resume analysis stays available offline.
+                </p>
               </div>
 
               <div className="md:col-span-2 p-5 rounded-2xl bg-black/40 border border-cyan-500/20 space-y-3 font-mono text-xs">

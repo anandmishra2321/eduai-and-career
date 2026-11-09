@@ -11,6 +11,9 @@ import {
   AcademicPredictionResponse,
   CareerRecommendationRequest,
   CareerRecommendation,
+  AIProviderId,
+  JobRoleRecommendation,
+  JobRoleRecommendationRequest,
   SkillGraphData,
   QuizQuestion,
   QuizResult,
@@ -31,6 +34,32 @@ class ApiError extends Error {
     this.status = status;
     this.data = data;
   }
+}
+
+function formatErrorDetail(detail: unknown): string | undefined {
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (!Array.isArray(detail)) {
+    return undefined;
+  }
+
+  const messages = detail.flatMap((item: unknown) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const error = item as { loc?: unknown; msg?: unknown };
+    const location = Array.isArray(error.loc)
+      ? error.loc.filter((part) => part !== "body").map(String).join(".")
+      : "";
+    const message = typeof error.msg === "string" ? error.msg : "";
+    const formatted = [location, message].filter(Boolean).join(": ");
+    return formatted ? [formatted] : [];
+  });
+
+  return messages.length > 0 ? messages.join("; ") : undefined;
 }
 
 function assertAuthResponse(response: AuthResponse): AuthResponse {
@@ -95,7 +124,7 @@ async function request<T>(
         // Preserve non-JSON error bodies as text.
       }
       const detail = errData && typeof errData === "object" && "detail" in errData
-        ? String((errData as { detail?: unknown }).detail ?? "")
+        ? formatErrorDetail(errData.detail)
         : "";
       throw new ApiError(
         detail || (typeof errData === "string" && errData) || `API Request failed with status ${res.status}`,
@@ -121,6 +150,12 @@ async function request<T>(
 }
 
 export const api = {
+  health: {
+    check: async (): Promise<{ status: "ok"; service: string; database: "ok" }> => {
+      return request("/api/health");
+    },
+  },
+
   // -----------------------------------------------------------
   // Authentication & Profile
   // -----------------------------------------------------------
@@ -215,6 +250,10 @@ export const api = {
       top_recommendations: CareerRecommendation[];
       identified_strengths: string[];
       suitability_score: number;
+      method: string;
+      provider: AIProviderId | null;
+      model: string | null;
+      disclaimer: string;
     }> => {
       return request("/api/career/recommend", {
         method: "POST",
@@ -262,6 +301,9 @@ export const api = {
   // Learning & Study Studio (RAG)
   // -----------------------------------------------------------
   learning: {
+    listDocuments: async (): Promise<DocumentSummary[]> => {
+      return request<DocumentSummary[]>("/api/documents");
+    },
     uploadDocument: async (file: File): Promise<DocumentSummary> => {
       const formData = new FormData();
       formData.append("file", file);
@@ -279,6 +321,23 @@ export const api = {
         body: JSON.stringify({ document_id: documentId, question }),
       });
     },
+    askDocumentWithAI: async (documentId: string, question: string) => {
+      return request<{
+        answer: string;
+        citations: Array<{ page: number; excerpt: string }>;
+        provider: AIProviderId;
+        model: string;
+      }>(`/api/documents/${encodeURIComponent(documentId)}/ask-ai`, {
+        method: "POST",
+        body: JSON.stringify({ question }),
+      });
+    },
+    summarizeDocument: async (documentId: string) => {
+      return request<{ summary: string; provider: "local"; model: string }>(
+        `/api/documents/${encodeURIComponent(documentId)}/summarize`,
+        { method: "POST" }
+      );
+    },
     generateFlashcards: async (documentId: string) => {
       return request<{ flashcards: Array<{ front: string; back: string }> }>(
         `/api/documents/${documentId}/flashcards`
@@ -290,6 +349,24 @@ export const api = {
   // Quiz System
   // -----------------------------------------------------------
   quiz: {
+    generateRandomBank: async (
+      questionCount: number,
+      difficulty: "Any" | "Easy" | "Medium" | "Hard"
+    ): Promise<{ quiz_id: string; questions: QuizQuestion[] }> => {
+      return request("/api/quiz/random-bank", {
+        method: "POST",
+        body: JSON.stringify({ question_count: questionCount, difficulty }),
+      });
+    },
+    generateFromDocument: async (
+      documentId: string,
+      questionCount: number
+    ): Promise<{ quiz_id: string; questions: QuizQuestion[] }> => {
+      return request(`/api/documents/${encodeURIComponent(documentId)}/quiz`, {
+        method: "POST",
+        body: JSON.stringify({ question_count: questionCount }),
+      });
+    },
     generate: async (options: {
       topic: string;
       difficulty: "Easy" | "Medium" | "Hard";
@@ -306,22 +383,80 @@ export const api = {
         body: JSON.stringify({ quiz_id: quizId, answers }),
       });
     },
+    explainAnswer: async (quizId: string, questionId: string) => {
+      return request<{
+        explanation: string;
+        is_correct: boolean;
+        correct_answer: string;
+        provider: AIProviderId;
+        model: string;
+      }>(`/api/quiz/${encodeURIComponent(quizId)}/questions/${encodeURIComponent(questionId)}/explain`, {
+        method: "POST",
+      });
+    },
   },
 
   // -----------------------------------------------------------
   // Personal AI Agent
   // -----------------------------------------------------------
   agent: {
-    execute: async (prompt: string, context?: Record<string, unknown>): Promise<AgentMessage> => {
+    execute: async (
+      prompt: string,
+      context?: Record<string, unknown>,
+      conversationId?: string
+    ): Promise<AgentMessage> => {
       return request<AgentMessage>("/api/agent/chat", {
         method: "POST",
-        body: JSON.stringify({ prompt, context }),
+        body: JSON.stringify({ prompt, context, conversation_id: conversationId }),
       });
     },
     getToolRegistry: async () => {
       return request<{ tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }> }>(
         "/api/agent/tools"
       );
+    },
+  },
+
+  ai: {
+    summarize: async (text: string, language: "auto" | "English" | "Hindi" = "auto") => {
+      return request<{ summary: string; provider: AIProviderId; model: string }>("/api/ai/summarize", {
+        method: "POST",
+        body: JSON.stringify({ text, language }),
+      });
+    },
+    getProviderSettings: async () => {
+      return request<{
+        primary_provider: AIProviderId;
+        fallback_provider: AIProviderId;
+        providers: Array<{
+          id: AIProviderId;
+          name: string;
+          enabled: boolean;
+          configured: boolean;
+          masked_credential: string;
+          model: string;
+          status: string;
+          last_checked_at: string | null;
+          last_error: string | null;
+          usage: { request_count: number; error_count: number; average_response_time_ms: number };
+        }>;
+      }>("/api/admin/ai/settings");
+    },
+    saveProviderSettings: async (settings: {
+      primary_provider: AIProviderId;
+      fallback_provider: AIProviderId;
+      providers: Array<{ provider: AIProviderId; enabled: boolean; model: string | null }>;
+    }) => request<{ status: string }>("/api/admin/ai/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
+    testProvider: async (provider: AIProviderId) => {
+      return request<{
+        provider: AIProviderId;
+        status: "connected";
+        response_time_ms: number;
+        models: string[];
+      }>(`/api/admin/ai/providers/${provider}/test`, { method: "POST" });
     },
   },
 
@@ -339,6 +474,19 @@ export const api = {
         suggestions: string[];
         bullet_point_improvements: Array<{ original: string; improved: string; reason: string }>;
       }>("/api/resume/analyze", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    aiSuggestions: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return request<{
+        filename: string;
+        suggestions: string;
+        provider: AIProviderId;
+        model: string;
+      }>("/api/resume/ai-suggestions", {
         method: "POST",
         body: formData,
       });
@@ -376,6 +524,17 @@ export const api = {
   // Jobs & Internship Intelligence
   // -----------------------------------------------------------
   jobs: {
+    recommend: async (data: JobRoleRecommendationRequest) => {
+      return request<{
+        roles: JobRoleRecommendation[];
+        provider: AIProviderId;
+        model: string;
+        disclaimer: string;
+      }>("/api/jobs/recommend", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
     search: async (query: string, location?: string) => {
       return request<{
         jobs: Array<{

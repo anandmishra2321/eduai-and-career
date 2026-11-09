@@ -38,8 +38,10 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
   const [query, setQuery] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
+  const [isSummarizingLocally, setIsSummarizingLocally] = useState(false);
   const [isLoadingFlashcards, setIsLoadingFlashcards] = useState(false);
   const [answer, setAnswer] = useState<{ answer: string; citations: Array<{ page: number; excerpt: string }> } | null>(null);
+  const [answerLabel, setAnswerLabel] = useState("Document service response");
   const [flashcards, setFlashcards] = useState<Array<{ front: string; back: string }>>([]);
   const [error, setError] = useState("");
 
@@ -65,12 +67,12 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
     setError("");
     for (const file of files) {
       const extension = file.name.split(".").pop()?.toLowerCase();
-      if (!["pdf", "docx"].includes(extension ?? "")) {
-        setError(`${file.name}: choose a PDF or DOCX file.`);
+      if (!["pdf", "docx", "txt", "md"].includes(extension ?? "")) {
+        setError(`${file.name}: choose a PDF, DOCX, TXT, or Markdown file.`);
         continue;
       }
-      if (file.size > 20 * 1024 * 1024) {
-        setError(`${file.name}: file size exceeds 20 MB.`);
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`${file.name}: file size exceeds 10 MB.`);
         continue;
       }
       try {
@@ -89,6 +91,7 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
         setDocuments((current) => [doc, ...current.filter((item) => item.id !== doc.id)]);
         setSelectedDoc(doc);
         setAnswer(null);
+        setAnswerLabel("Document service response");
         setFlashcards([]);
         onDocumentSelect?.(doc);
       } catch (cause) {
@@ -111,12 +114,59 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
     setIsAsking(true);
     setError("");
     setAnswer(null);
+    setAnswerLabel("Document service response");
     try {
       setAnswer(await api.learning.askDocument(selectedDoc.id, question));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Document question failed.");
     } finally {
       setIsAsking(false);
+    }
+  };
+
+  const handleAskWithAI = async () => {
+    const question = query.trim();
+    if (!selectedDoc) {
+      setError("Upload and select a document before asking a question.");
+      return;
+    }
+    if (question.length < 2) {
+      setError("Enter a question with at least two characters.");
+      return;
+    }
+    setIsAsking(true);
+    setError("");
+    setAnswer(null);
+    try {
+      const result = await api.learning.askDocumentWithAI(selectedDoc.id, question);
+      setAnswer(result);
+      setAnswerLabel(`AI answer · ${result.provider} · ${result.model}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "AI document question failed.");
+    } finally {
+      setIsAsking(false);
+    }
+  };
+
+  const handleLocalSummarize = async () => {
+    if (!selectedDoc) {
+      setError("Upload and select a document before generating a summary.");
+      return;
+    }
+    setIsSummarizingLocally(true);
+    setError("");
+    try {
+      const result = await api.learning.summarizeDocument(selectedDoc.id);
+      const updatedDoc = { ...selectedDoc, summary: result.summary };
+      setSelectedDoc(updatedDoc);
+      setDocuments((current) => current.map((doc) => doc.id === updatedDoc.id ? updatedDoc : doc));
+      setAnswer({ answer: result.summary, citations: [] });
+      setAnswerLabel(`Local summary · ${result.model}`);
+      onDocumentSelect?.(updatedDoc);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Local document summary failed.");
+    } finally {
+      setIsSummarizingLocally(false);
     }
   };
 
@@ -290,6 +340,8 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
           {[
             { label: "View summary", icon: <Brain className="h-4 w-4" />, action: () => setAnswer(selectedDoc ? { answer: selectedDoc.summary || "No summary returned by the document service.", citations: [] } : null), disabled: !selectedDoc },
             { label: "Ask question", icon: <MessageSquare className="h-4 w-4" />, action: () => void handleAsk(), disabled: !selectedDoc || query.trim().length < 2 || isAsking },
+            { label: "Ask with AI", icon: <Sparkles className="h-4 w-4" />, action: () => void handleAskWithAI(), disabled: !selectedDoc || query.trim().length < 2 || isAsking },
+            { label: "Summarize locally", icon: <Brain className="h-4 w-4" />, action: () => void handleLocalSummarize(), disabled: !selectedDoc || isSummarizingLocally },
             { label: "Create flashcards", icon: <Layers className="h-4 w-4" />, action: () => void handleGenerateFlashcards(), disabled: !selectedDoc || isLoadingFlashcards },
             { label: "Export notes", icon: <Download className="h-4 w-4" />, action: exportNotes, disabled: !selectedDoc },
           ].map((action) => (
@@ -302,7 +354,11 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
             >
               <div className="text-cyan-300">{action.icon}</div>
               <span className="text-[10px] font-mono text-slate-300 group-hover:text-white">
-                {action.label === "Create flashcards" && isLoadingFlashcards ? "Generating…" : action.label}
+                {action.label === "Create flashcards" && isLoadingFlashcards
+                  ? "Generating…"
+                  : action.label === "Summarize locally" && isSummarizingLocally
+                    ? "Summarizing…"
+                    : action.label}
               </span>
             </button>
           ))}
@@ -313,9 +369,7 @@ export function StudyStudio({ onDocumentSelect }: StudyStudioProps) {
             <div className="p-4 rounded-xl bg-black/40 border border-cyan-500/20">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-mono text-cyan-400 uppercase">
-                  Document service response
-                </span>
+                <span className="text-xs font-mono text-cyan-400 uppercase">{answerLabel}</span>
               </div>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{answer.answer}</p>
               {answer.citations.length > 0 && (
